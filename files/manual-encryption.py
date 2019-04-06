@@ -1,19 +1,51 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" Manually decrypt a wep message given the WEP key"""
+""" Manually encrypt a wep message given the WEP key"""
 
 __author__      = "Guillaume Blanco, Patrick Neto"
 __version__ 	= "1.0"
 __email__ 		= "guillaume.blanco@heig-vd.ch, patrick.neto@heig-vd.ch"
 
 from scapy.all import *
-import binascii
 import os
 import rc4
 
 #Cle wep AA:AA:AA:AA:AA
-KEY = '\xaa\xaa\xaa\xaa\xaa'
+key = '\xaa\xaa\xaa\xaa\xaa'
+
+# On recupere un message qui va nous servir de base
+arp = rdpcap('arp.cap')[0]
+
+# On extrait l iv du message et on le concatene avec notre cle pour creer notre seed (pour l algo RC4)
+seed = arp.iv+key
+
+# message que l on veut chiffrer
+message = "Bonjour Patrick comment tu vas ?"
+
+# calcul du crc sur le message
+icv= crc32(message)
+
+# on concatene le message et l icv pour avoir le message a chiffrer
+message_a_chiffrer = message + str(icv)
+
+# on chiffre le message avec rc4
+
+message_chiffre = rc4.rc4crypt(message_a_chiffrer,seed)
+
+# "le ICV est les derniers 4 octets - je le passe en format Long big endian"
+icv_chiffre = message_chiffre[-4:]
+(icv_numerique,) = struct.unpack('!L', icv_chiffre)
+
+# le message chiffre sans le ICV
+text_chiffre = message_chiffre[:-4]
+
+arp.wepdata = text_chiffre
+arp.icv = icv_numerique
+
+wrpcap('arp_chiffre.cap',arp)
+
+'''
 IV = os.urandom(4)
 
 print("IV = " + binascii.hexlify(IV))
@@ -30,3 +62,4 @@ packet = RadioTap(version=0, pad=0, len=18,
                    wepdata='SWI - Labo02 - WEP', 
                    icv=423423)
 packet.show()
+'''
