@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-""" Manually encrypt a wep message given the WEP key"""
+""" Manually encrypt a wep message in fragments, given the WEP key"""
 
 __author__      = "Guillaume Blanco, Patrick Neto"
 __version__ 	= "1.0"
@@ -16,37 +16,10 @@ import binascii
 MESSAGE  = "Bonjour Patrick comment tu vas ? On va essayer avec un message un peu plus long pour en avoir pour 3 frag"
 CAPFILE_CLAIR = "arp.cap"
 CAPFILE_CHIFFRE_FRAG = "arp_chiffre_frag.cap"
-
 TAILLE_MESSAGE_MAX = 36
 
-#Cle wep AA:AA:AA:AA:AA
-key = '\xaa\xaa\xaa\xaa\xaa'
-
-# on calcul la taille du message et le nombre de fragment qu'il nous faut
-long_mes = len(MESSAGE)
-nb_frag = int(long_mes/TAILLE_MESSAGE_MAX)
-
-# Si le message n'est pas un multiple de 36 on le pad ( il y a des problèmes si le message est plus grand que 36)
-if((long_mes% TAILLE_MESSAGE_MAX) != 0):
-    nb_pad = TAILLE_MESSAGE_MAX - long_mes % TAILLE_MESSAGE_MAX
-    for i in range(nb_pad):
-        MESSAGE += " "
-    nb_frag += 1
-
-# on cree un liste pour stocker nos fragments ( pour pouvoir les mettres dans wrpcap ensuite)
-fragments = []
-
-# on fait une boucle pour creer nos fragement avec leur numero et le fragment final
-for i in range(nb_frag):
-
-    message_a_chiffre = MESSAGE[(i*TAILLE_MESSAGE_MAX):((i+1)*TAILLE_MESSAGE_MAX)]
-    chiffrement(message_a_chiffre)
-    
-
-def chiffrement(message):
-    # On recupere un message qui va nous servir de base
+def chiffrement(message, i, nb_frag):
     arp = rdpcap(CAPFILE_CLAIR)[0]
-
     # On extrait l iv du message et on le concatene avec notre cle pour creer notre seed (pour l algo RC4)
     seed = arp.iv + key
 
@@ -67,7 +40,34 @@ def chiffrement(message):
 
     arp.wepdata = text_chiffre
     arp.icv = icv_numerique
+    arp.SC = i
 
-'''
-wrpcap(CAPFILE_CHIFFRE_FRAG,arp)
-'''
+    if i != nb_frag - 1:
+        arp.FCfield = arp.FCfield | 0x4
+    
+    return arp
+
+#Cle wep AA:AA:AA:AA:AA
+key = '\xaa\xaa\xaa\xaa\xaa'
+
+# on calcul la taille du message et le nombre de fragment qu'il nous faut
+long_mes = len(MESSAGE)
+nb_frag = int(long_mes/TAILLE_MESSAGE_MAX)
+
+# Si le message n'est pas un multiple de 36 on le pad ( il y a des problèmes si le message est plus grand que 36)
+if((long_mes% TAILLE_MESSAGE_MAX) != 0):
+    nb_pad = TAILLE_MESSAGE_MAX - long_mes % TAILLE_MESSAGE_MAX
+    for i in range(nb_pad):
+        MESSAGE += " "
+    nb_frag += 1
+
+# on cree un liste pour stocker nos fragments ( pour pouvoir les mettres dans wrpcap ensuite)
+fragments = []
+
+# on fait une boucle pour creer nos fragement avec leur numero et le fragment final
+for i in range(nb_frag):
+    message_a_chiffre = MESSAGE[(i*TAILLE_MESSAGE_MAX):((i+1)*TAILLE_MESSAGE_MAX)]
+    fragments.append(chiffrement(message_a_chiffre, i, nb_frag))
+
+
+wrpcap(CAPFILE_CHIFFRE_FRAG, fragments)
