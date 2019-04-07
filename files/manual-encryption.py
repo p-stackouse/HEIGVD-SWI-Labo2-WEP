@@ -41,6 +41,7 @@ icv_chiffre = message_chiffre[-4:]
 # le message chiffre sans le ICV
 text_chiffre = message_chiffre[:-4]
 
+#Vérification des entrées et sorties
 print("Message clair   = " + message_a_chiffrer.encode("hex"))
 print("Texte clair     = " + MESSAGE.encode("hex"))
 print("Message chiffré = " + message_chiffre.encode("hex")) 

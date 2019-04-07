@@ -18,15 +18,18 @@ CAPFILE_CLAIR = "arp.cap"
 CAPFILE_CHIFFRE_FRAG = "arp_chiffre_frag.cap"
 TAILLE_MESSAGE_MAX = 36
 
+#Permet de chiffrer le fragment de message, en prenant en paramètre le fragment, son numéro et le nombre
+#de fragments totaux
 def chiffrement(message, i, nb_frag):
     arp = rdpcap(CAPFILE_CLAIR)[0]
     # On extrait l iv du message et on le concatene avec notre cle pour creer notre seed (pour l algo RC4)
     seed = arp.iv + key
 
-    crc_msg = binascii.crc32(MESSAGE)
+    #Calcul CRC
+    crc_msg = binascii.crc32(message)
 
     # on concatene le message et l icv pour avoir le message a chiffrer
-    message_a_chiffrer = MESSAGE + struct.pack('<i', crc_msg)
+    message_a_chiffrer = message + struct.pack('<i', crc_msg)
 
     # on chiffre le message avec rc4
     message_chiffre = rc4.rc4crypt(message_a_chiffrer, seed)
@@ -38,10 +41,12 @@ def chiffrement(message, i, nb_frag):
     # le message chiffre sans le ICV
     text_chiffre = message_chiffre[:-4]
 
+    #Ajout des champs avec texte chiffré, ICV et numéro de fragment
     arp.wepdata = text_chiffre
     arp.icv = icv_numerique
     arp.SC = i
 
+    #Repérer dernier fragment
     if i != nb_frag - 1:
         arp.FCfield = arp.FCfield | 0x4
     
@@ -67,7 +72,8 @@ fragments = []
 # on fait une boucle pour creer nos fragement avec leur numero et le fragment final
 for i in range(nb_frag):
     message_a_chiffre = MESSAGE[(i*TAILLE_MESSAGE_MAX):((i+1)*TAILLE_MESSAGE_MAX)]
+    print(message_a_chiffre)
     fragments.append(chiffrement(message_a_chiffre, i, nb_frag))
 
-
+#Ecriture du fichier CAP en sortie avec les 3 fragments
 wrpcap(CAPFILE_CHIFFRE_FRAG, fragments)
